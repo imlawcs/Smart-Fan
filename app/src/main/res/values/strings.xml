@@ -1,3 +1,27 @@
 <resources>
     <string name="app_name">Fan</string>
+    <string name="bluetooth_not_available">Bluetooth không khả dụng</string>
+    <string name="please_enable_bluetooth">Vui lòng bật Bluetooth</string>
+    <string name="need_permission_to_scan">Cần cấp quyền để quét</string>
+    <string name="need_permission_to_connect">Cần quyền BLUETOOTH_CONNECT</string>
+    <string name="scanning_devices">Đang quét thiết bị...</string>
+    <string name="device_not_found">Không tìm thấy HMSoft</string>
+    <string name="connecting_to">Đang kết nối tới %s</string>
+    <string name="connected_to">Đã kết nối tới %s</string>
+    <string name="disconnected">Đã ngắt kết nối</string>
+    <string name="connect_to_hmsoft">Kết nối tới HMSoft</string>
+    <string name="disconnect">Ngắt kết nối</string>
+    <string name="auto_mode_on">AUTO Mode ON</string>
+    <string name="auto_mode_off">AUTO Mode OFF</string>
+    <string name="auto_mode_on_disconnected">AUTO Mode ON (Đã ngắt kết nối)</string>
+    <string name="permissions_granted">Quyền đã được cấp</string>
+    <string name="need_permissions_to_connect">Cần cấp quyền để kết nối</string>
+    <string name="please_grant_permissions">Vui lòng cấp quyền trong Cài đặt > Ứng dụng > Quyền</string>
+    <string name="not_connected">Chưa kết nối</string>
+    <string name="command_sent">Đã gửi: %s</string>
+    <string name="command_failed">Gửi lệnh thất bại</string>
+    <string name="service_not_found">Không tìm thấy service</string>
+    <string name="characteristic_not_found">Không tìm thấy characteristic</string>
+    <string name="on">ON</string>
+    <string name="off">OFF</string>
 </resources>

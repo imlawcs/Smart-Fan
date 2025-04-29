@@ -1,14 +1,22 @@
 package com.midterm22nh12.fan;
 
+import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothSocket;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.Button;
@@ -20,58 +28,62 @@ import androidx.core.content.ContextCompat;
 
 import com.midterm22nh12.fan.R;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.UUID;
-import android.Manifest;
 
 public class MainActivity extends Activity {
 
     // UI components
     private Button btnAuto, btnOn1, btnOn2, btnToggle, btnConnect;
-    private TextView status;
+    private TextView statusText;
 
     // State variables
-    private boolean isOn = false;       // Toggle button state (ON/OFF)
-    private boolean isAutoMode = false; // AUTO mode state
-    private boolean isConnected = false;// Bluetooth connection state
+    private boolean isOn = false;
+    private boolean isAutoMode = false;
+    private boolean isConnected = false;
 
     // Bluetooth components
     private BluetoothAdapter bluetoothAdapter;
-    private BluetoothSocket bluetoothSocket;
-    private OutputStream outputStream;
-    private static final String DEVICE_NAME = "HMSoft"; // HM-10 device name
-    private static final UUID BT_MODULE_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"); // SPP UUID
+    private BluetoothLeScanner bluetoothLeScanner;
+    private BluetoothGatt bluetoothGatt;
+    private BluetoothGattCharacteristic characteristic;
+    private static final String DEVICE_NAME = "HMSoft"; // Hoặc "QuatTuDong" nếu đã đổi
+    private static final UUID SERVICE_UUID = UUID.fromString("0000FFE0-0000-1000-8000-00805F9B34FB");
+    private static final UUID CHARACTERISTIC_UUID = UUID.fromString("0000FFE1-0000-1000-8000-00805F9B34FB");
+    private static final long SCAN_PERIOD = 10000; // Quét trong 10 giây
 
     // Permission request code
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 1;
     private static final String TAG = "MainActivity";
+    private final Handler handler = new Handler();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Initialize UI components
-        status = findViewById(R.id.status);
+// Initialize UI components
+        statusText = findViewById(R.id.status);
         btnAuto = findViewById(R.id.btnAuto);
         btnOn1 = findViewById(R.id.btnOn1);
         btnOn2 = findViewById(R.id.btnOn2);
         btnToggle = findViewById(R.id.btnToggle);
         btnConnect = findViewById(R.id.btnConnect);
 
-        // Initialize Bluetooth adapter
+// Initialize Bluetooth adapter
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (bluetoothAdapter != null) {
+            bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
+        }
 
-        // Check and request permissions
+// Check and request permissions
         checkAndRequestPermissions();
 
-        // Set up button listeners
+// Set up button listeners
         btnConnect.setOnClickListener(v -> {
             if (!isConnected) {
                 Log.d(TAG, "Attempting to connect to HMSoft...");
-                connectToBluetooth();
+                startScan();
             } else {
                 Log.d(TAG, "Attempting to disconnect from HMSoft...");
                 disconnectFromBluetooth();
@@ -82,45 +94,56 @@ public class MainActivity extends Activity {
             isAutoMode = !isAutoMode;
             if (isAutoMode) {
                 sendCommand("AUTO\n");
-                status.setText("AUTO Mode ON");
+                statusText.setText(R.string.auto_mode_on);
                 btnAuto.setBackgroundResource(R.drawable.rounded_button);
             } else {
+                sendCommand("MANUAL\n");
                 sendCommand("OFF\n");
-                status.setText("AUTO Mode OFF");
-                btnToggle.setText("OFF");
+                statusText.setText(R.string.auto_mode_off);
+                btnToggle.setText(R.string.off);
                 btnToggle.setBackgroundResource(R.drawable.circle_button_off);
+                btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
                 isOn = false;
             }
         });
 
         btnOn1.setOnClickListener(v -> {
-            isAutoMode = false;
-            sendCommand("ON1\n");
-            btnToggle.setText("ON");
-            btnToggle.setBackgroundResource(R.drawable.circle_button_on);
-            isOn = true;
+            if (!isAutoMode) {
+                sendCommand("MANUAL\n");
+                sendCommand("ON1\n");
+                btnToggle.setText(R.string.on);
+                btnToggle.setBackgroundResource(R.drawable.circle_button_on);
+                btnAuto.setBackgroundResource(R.drawable.circle_button_off);
+                isOn = true;
+            }
         });
 
         btnOn2.setOnClickListener(v -> {
-            isAutoMode = false;
-            sendCommand("ON2\n");
-            btnToggle.setText("ON");
-            btnToggle.setBackgroundResource(R.drawable.circle_button_on);
-            isOn = true;
+            if (!isAutoMode) {
+                sendCommand("MANUAL\n");
+                sendCommand("ON2\n");
+                btnToggle.setText(R.string.on);
+                btnToggle.setBackgroundResource(R.drawable.circle_button_on);
+                btnAuto.setBackgroundResource(R.drawable.circle_button_off);
+                isOn = true;
+            }
         });
 
         btnToggle.setOnClickListener(v -> {
-            isAutoMode = false;
-            if (isOn) {
-                sendCommand("OFF\n");
-                btnToggle.setText("OFF");
-                btnToggle.setBackgroundResource(R.drawable.circle_button_off);
-                isOn = false;
-            } else {
-                sendCommand("ON1\n");
-                btnToggle.setText("ON");
-                btnToggle.setBackgroundResource(R.drawable.circle_button_on);
-                isOn = true;
+            if (!isAutoMode) {
+                if (isOn) {
+                    sendCommand("MANUAL\n");
+                    sendCommand("OFF\n");
+                    btnToggle.setText(R.string.off);
+                    btnToggle.setBackgroundResource(R.drawable.circle_button_off);
+                    isOn = false;
+                } else {
+                    sendCommand("MANUAL\n");
+                    sendCommand("ON1\n");
+                    btnToggle.setText(R.string.on);
+                    btnToggle.setBackgroundResource(R.drawable.circle_button_on);
+                    isOn = true;
+                }
             }
         });
     }
@@ -128,7 +151,6 @@ public class MainActivity extends Activity {
     private void checkAndRequestPermissions() {
         ArrayList<String> permissionsToRequest = new ArrayList<>();
 
-        // Request BLUETOOTH_CONNECT and BLUETOOTH_SCAN only on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT);
@@ -138,11 +160,7 @@ public class MainActivity extends Activity {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_SCAN);
                 Log.d(TAG, "Requesting BLUETOOTH_SCAN permission");
             }
-        } else {
-            Log.d(TAG, "Android version < 12, using BLUETOOTH and BLUETOOTH_ADMIN permissions");
         }
-
-        // Request location permissions (required for Bluetooth scanning on Android 10+)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
             Log.d(TAG, "Requesting ACCESS_FINE_LOCATION permission");
@@ -155,9 +173,6 @@ public class MainActivity extends Activity {
         if (!permissionsToRequest.isEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), REQUEST_BLUETOOTH_PERMISSIONS);
             Log.d(TAG, "Requesting permissions: " + permissionsToRequest.toString());
-        } else {
-            Log.d(TAG, "All permissions granted, attempting to connect...");
-            connectToBluetooth();
         }
     }
 
@@ -173,164 +188,275 @@ public class MainActivity extends Activity {
                 }
             }
             if (allPermissionsGranted) {
-                status.setText("Quyền đã được cấp");
-                Log.d(TAG, "Permissions granted, attempting to connect...");
-                connectToBluetooth();
+                statusText.setText(R.string.permissions_granted);
+                Log.d(TAG, "Permissions granted");
             } else {
-                status.setText("Cần cấp quyền để kết nối");
+                statusText.setText(R.string.need_permissions_to_connect);
                 Log.d(TAG, "Permissions denied");
-                boolean shouldShowRationale = false;
-                for (String permission : permissions) {
-                    if (ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
-                        shouldShowRationale = true;
-                        break;
-                    }
-                }
-                if (!shouldShowRationale) {
-                    Toast.makeText(this, "Quyền bị từ chối. Vui lòng cấp quyền trong Cài đặt > Ứng dụng > Quyền", Toast.LENGTH_LONG).show();
-                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                    Uri uri = Uri.fromParts("package", getPackageName(), null);
-                    intent.setData(uri);
-                    startActivity(intent);
-                } else {
-                    Toast.makeText(this, "Vui lòng cấp quyền để tiếp tục", Toast.LENGTH_LONG).show();
-                }
+                Toast.makeText(this, R.string.please_grant_permissions, Toast.LENGTH_LONG).show();
+                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                Uri uri = Uri.fromParts("package", getPackageName(), null);
+                intent.setData(uri);
+                startActivity(intent);
             }
         }
     }
 
-    private void connectToBluetooth() {
-        // Check if Bluetooth is available and enabled
+    private void startScan() {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-            status.setText("Bluetooth không khả dụng");
+            statusText.setText(R.string.bluetooth_not_available);
             Log.d(TAG, "Bluetooth is not available or not enabled");
-            Toast.makeText(this, "Vui lòng bật Bluetooth", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, R.string.please_enable_bluetooth, Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Check permissions for Android 12+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                status.setText("Không có quyền Bluetooth");
-                Log.d(TAG, "Bluetooth permission not granted");
-                checkAndRequestPermissions();
-                return;
-            }
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-                status.setText("Không có quyền quét Bluetooth");
-                Log.d(TAG, "Bluetooth scan permission not granted");
-                checkAndRequestPermissions();
-                return;
-            }
-        }
-
-        // Check location permission
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            status.setText("Không có quyền Vị trí");
-            Log.d(TAG, "Location permission not granted");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                && (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED
+                || ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)) {
+            statusText.setText(R.string.need_permission_to_scan);
             checkAndRequestPermissions();
             return;
         }
 
-        // Look for HMSoft in paired devices
-        boolean deviceFound = false;
-        for (BluetoothDevice device : bluetoothAdapter.getBondedDevices()) {
-            if (device.getName() != null && device.getName().equals(DEVICE_NAME)) {
-                deviceFound = true;
-                Log.d(TAG, "Found HMSoft in paired devices");
-                try {
-                    bluetoothSocket = device.createRfcommSocketToServiceRecord(BT_MODULE_UUID);
-                    Log.d(TAG, "Attempting to connect to HMSoft...");
-                    bluetoothSocket.connect();
-                    outputStream = bluetoothSocket.getOutputStream();
-                    runOnUiThread(() -> {
-                        status.setText("Đã kết nối tới " + DEVICE_NAME);
-                        isConnected = true;
-                        btnConnect.setText("Ngắt kết nối");
-                        btnConnect.setBackgroundResource(R.drawable.rounded_button_disconnect);
-                        Log.d(TAG, "Connected successfully, button text updated to 'Ngắt kết nối'");
-                    });
-                } catch (IOException e) {
-                    runOnUiThread(() -> {
-                        status.setText("Kết nối thất bại");
-                        Log.d(TAG, "Connection failed: " + e.getMessage());
-                        Toast.makeText(this, "Kết nối thất bại. Vui lòng kiểm tra HMSoft.", Toast.LENGTH_LONG).show();
-                    });
-                    closeResources();
-                    e.printStackTrace();
+        statusText.setText(R.string.scanning_devices);
+        Log.d(TAG, "Starting BLE scan...");
+        try {
+            ScanCallback localScanCallback = new ScanCallback() {
+                @Override
+                public void onScanResult(int callbackType, ScanResult result) {
+                    super.onScanResult(callbackType, result);
+                    BluetoothDevice device = result.getDevice();
+                    if (device.getName() != null && device.getName().equals(DEVICE_NAME)) {
+                        Log.d(TAG, "Found HMSoft: " + device.getName());
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                                    && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                                statusText.setText(R.string.need_permission_to_scan);
+                                checkAndRequestPermissions();
+                                return;
+                            }
+                            bluetoothLeScanner.stopScan(this);
+                        } catch (SecurityException e) {
+                            statusText.setText(R.string.need_permission_to_scan);
+                            Log.d(TAG, "SecurityException in stopScan: " + e.getMessage());
+                            checkAndRequestPermissions();
+                            return;
+                        }
+                        connectToDevice(device);
+                    }
                 }
+            };
+
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                        && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                    statusText.setText(R.string.need_permission_to_scan);
+                    checkAndRequestPermissions();
+                    return;
+                }
+                bluetoothLeScanner.startScan(localScanCallback);
+            } catch (SecurityException e) {
+                statusText.setText(R.string.need_permission_to_scan);
+                Log.d(TAG, "SecurityException in startScan: " + e.getMessage());
+                checkAndRequestPermissions();
                 return;
             }
-        }
 
-        if (!deviceFound) {
-            runOnUiThread(() -> {
-                status.setText("HMSoft chưa được ghép nối");
-                Log.d(TAG, "HMSoft not found in paired devices");
-                Toast.makeText(this, "Vui lòng ghép nối với HMSoft trong Cài đặt Bluetooth", Toast.LENGTH_LONG).show();
-            });
+// Dừng quét sau SCAN_PERIOD
+            handler.postDelayed(() -> {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                            && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                        statusText.setText(R.string.need_permission_to_scan);
+                        checkAndRequestPermissions();
+                        return;
+                    }
+                    bluetoothLeScanner.stopScan(localScanCallback);
+                    if (!isConnected) {
+                        statusText.setText(R.string.device_not_found);
+                        Log.d(TAG, "Scan stopped, HMSoft not found");
+                        Toast.makeText(MainActivity.this, R.string.device_not_found, Toast.LENGTH_LONG).show();
+                    }
+                } catch (SecurityException e) {
+                    statusText.setText(R.string.need_permission_to_scan);
+                    Log.d(TAG, "SecurityException in stopScan: " + e.getMessage());
+                    checkAndRequestPermissions();
+                }
+            }, SCAN_PERIOD);
+        } catch (SecurityException e) {
+            statusText.setText(R.string.need_permission_to_scan);
+            Log.d(TAG, "SecurityException in startScan: " + e.getMessage());
+            checkAndRequestPermissions();
         }
     }
 
-    private void disconnectFromBluetooth() {
-        closeResources();
-        runOnUiThread(() -> {
-            status.setText("Đã ngắt kết nối");
-            isConnected = false;
-            btnConnect.setText("Kết nối tới HMSoft");
-            btnConnect.setBackgroundResource(R.drawable.rounded_button);
-            Log.d(TAG, "Disconnected successfully, button text updated to 'Kết nối tới HMSoft'");
+    private void connectToDevice(BluetoothDevice device) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            statusText.setText(R.string.need_permission_to_connect);
+            checkAndRequestPermissions();
+            return;
+        }
 
-            // Automatically enable AUTO mode after disconnect
-            isAutoMode = true;
-            sendCommand("AUTO\n");
-            status.setText("AUTO Mode ON (Đã ngắt kết nối)");
-            btnAuto.setBackgroundResource(R.drawable.rounded_button);
-        });
+        statusText.setText(String.format(getString(R.string.connecting_to), DEVICE_NAME));
+        Log.d(TAG, "Connecting to " + device.getName());
+        try {
+            bluetoothGatt = device.connectGatt(this, false, gattCallback);
+        } catch (SecurityException e) {
+            statusText.setText(R.string.need_permission_to_connect);
+            Log.d(TAG, "SecurityException in connectGatt: " + e.getMessage());
+            checkAndRequestPermissions();
+        }
     }
+
+    private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int gattStatus, int newState) {
+            super.onConnectionStateChange(gatt, gattStatus, newState);
+            if (newState == BluetoothGatt.STATE_CONNECTED) {
+                runOnUiThread(() -> {
+                    statusText.setText(String.format(getString(R.string.connected_to), DEVICE_NAME));
+                    isConnected = true;
+                    btnConnect.setText(R.string.disconnect);
+                    btnConnect.setBackgroundResource(R.drawable.rounded_button_disconnect);
+                    Log.d(TAG, "Connected to HMSoft");
+                });
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                            && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                        runOnUiThread(() -> statusText.setText(R.string.need_permission_to_connect));
+                        checkAndRequestPermissions();
+                        return;
+                    }
+                    gatt.discoverServices();
+                } catch (SecurityException e) {
+                    runOnUiThread(() -> statusText.setText(R.string.need_permission_to_connect));
+                    Log.d(TAG, "SecurityException in discoverServices: " + e.getMessage());
+                    checkAndRequestPermissions();
+                }
+            } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
+                runOnUiThread(() -> {
+                    statusText.setText(R.string.disconnected);
+                    isConnected = false;
+                    isAutoMode = false;
+                    isOn = false;
+                    btnConnect.setText(R.string.connect_to_hmsoft);
+                    btnConnect.setBackgroundResource(R.drawable.rounded_button);
+                    btnAuto.setBackgroundResource(R.drawable.circle_button_off);
+                    btnToggle.setText(R.string.off);
+                    btnToggle.setBackgroundResource(R.drawable.circle_button_off);
+                    Log.d(TAG, "Disconnected from HMSoft");
+                });
+                closeGatt();
+            }
+        }
+
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int serviceStatus) {
+            super.onServicesDiscovered(gatt, serviceStatus);
+            if (serviceStatus == BluetoothGatt.GATT_SUCCESS) {
+                BluetoothGattService service = gatt.getService(SERVICE_UUID);
+                if (service != null) {
+                    characteristic = service.getCharacteristic(CHARACTERISTIC_UUID);
+                    if (characteristic != null) {
+                        Log.d(TAG, "Found characteristic FFE1");
+                    } else {
+                        runOnUiThread(() -> statusText.setText(R.string.characteristic_not_found));
+                        Log.d(TAG, "Characteristic FFE1 not found");
+                    }
+                } else {
+                    runOnUiThread(() -> statusText.setText(R.string.service_not_found));
+                    Log.d(TAG, "Service FFE0 not found");
+                }
+            }
+        }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int writeStatus) {
+            super.onCharacteristicWrite(gatt, characteristic, writeStatus);
+            if (writeStatus == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG, "Command sent successfully");
+            } else {
+                runOnUiThread(() -> statusText.setText(R.string.command_failed));
+                Log.d(TAG, "Failed to send command");
+            }
+        }
+    };
 
     private void sendCommand(String command) {
-        if (outputStream != null && isConnected) {
+        if (isConnected && characteristic != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                statusText.setText(R.string.need_permission_to_connect);
+                checkAndRequestPermissions();
+                return;
+            }
+            characteristic.setValue(command);
             try {
-                outputStream.write(command.getBytes());
-                if (!isAutoMode) {
-                    status.setText("Đã gửi: " + command.trim());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                        && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    statusText.setText(R.string.need_permission_to_connect);
+                    checkAndRequestPermissions();
+                    return;
+                }
+                bluetoothGatt.writeCharacteristic(characteristic);
+                if (!isAutoMode || command.equals("AUTO\n")) {
+                    statusText.setText(String.format(getString(R.string.command_sent), command.trim()));
                     Log.d(TAG, "Sent command: " + command.trim());
                 }
-            } catch (IOException e) {
-                status.setText("Gửi lệnh thất bại");
-                Log.d(TAG, "Failed to send command: " + e.getMessage());
-                closeResources();
-                e.printStackTrace();
+            } catch (SecurityException e) {
+                statusText.setText(R.string.need_permission_to_connect);
+                Log.d(TAG, "SecurityException in writeCharacteristic: " + e.getMessage());
+                checkAndRequestPermissions();
             }
         } else {
-            status.setText("Chưa kết nối");
+            statusText.setText(R.string.not_connected);
             Log.d(TAG, "Cannot send command: Not connected");
         }
     }
 
-    private void closeResources() {
-        try {
-            if (outputStream != null) {
-                outputStream.close();
-                outputStream = null;
-                Log.d(TAG, "OutputStream closed successfully");
+    private void disconnectFromBluetooth() {
+        if (bluetoothGatt != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                statusText.setText(R.string.need_permission_to_connect);
+                checkAndRequestPermissions();
+                return;
             }
-            if (bluetoothSocket != null) {
-                bluetoothSocket.close();
-                bluetoothSocket = null;
-                Log.d(TAG, "BluetoothSocket closed successfully");
+            try {
+                bluetoothGatt.disconnect();
+            } catch (SecurityException e) {
+                statusText.setText(R.string.need_permission_to_connect);
+                Log.d(TAG, "SecurityException in disconnect: " + e.getMessage());
+                checkAndRequestPermissions();
             }
-        } catch (IOException e) {
-            Log.d(TAG, "Failed to close resources: " + e.getMessage());
-            e.printStackTrace();
+        }
+    }
+
+    private void closeGatt() {
+        if (bluetoothGatt != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                statusText.setText(R.string.need_permission_to_connect);
+                checkAndRequestPermissions();
+                return;
+            }
+            try {
+                bluetoothGatt.close();
+                bluetoothGatt = null;
+                characteristic = null;
+            } catch (SecurityException e) {
+                statusText.setText(R.string.need_permission_to_connect);
+                Log.d(TAG, "SecurityException in closeGatt: " + e.getMessage());
+                checkAndRequestPermissions();
+            }
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        closeResources();
+        closeGatt();
         Log.d(TAG, "onDestroy: Resources closed");
     }
 }
