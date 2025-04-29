@@ -1,7 +1,6 @@
 package com.midterm22nh12.fan;
 
 import android.Manifest;
-import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -24,6 +23,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -32,7 +32,7 @@ import com.midterm22nh12.fan.R;
 import java.util.ArrayList;
 import java.util.UUID;
 
-public class MainActivity extends Activity {
+public class MainActivity extends AppCompatActivity {
 
     // UI components
     private Button btnAuto, btnOn1, btnOn2, btnToggle, btnConnect;
@@ -54,8 +54,9 @@ public class MainActivity extends Activity {
     private static final UUID CLIENT_CHARACTERISTIC_CONFIG = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB");
     private static final long SCAN_PERIOD = 10000;
 
-    // Permission request code
+    // Permission request codes
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 1;
+    private static final int REQUEST_ENABLE_BLUETOOTH = 2;
     private static final String TAG = "MainActivity";
     private final Handler handler = new Handler();
 
@@ -73,16 +74,16 @@ public class MainActivity extends Activity {
         btnToggle = findViewById(R.id.btnToggle);
         btnConnect = findViewById(R.id.btnConnect);
 
-// Initialize Bluetooth adapter
+        // Initialize Bluetooth adapter
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (bluetoothAdapter != null) {
             bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
         }
 
-// Check and request permissions
+        // Check and request permissions
         checkAndRequestPermissions();
 
-// Set up button listeners
+        // Set up button listeners
         btnConnect.setOnClickListener(v -> {
             if (!isConnected) {
                 Log.d(TAG, "Attempting to connect to HMSoft...");
@@ -167,10 +168,6 @@ public class MainActivity extends Activity {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
             Log.d(TAG, "Requesting ACCESS_FINE_LOCATION permission");
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION);
-            Log.d(TAG, "Requesting ACCESS_COARSE_LOCATION permission");
-        }
 
         if (!permissionsToRequest.isEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), REQUEST_BLUETOOTH_PERMISSIONS);
@@ -208,7 +205,8 @@ public class MainActivity extends Activity {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
             statusText.setText(R.string.bluetooth_not_available);
             Log.d(TAG, "Bluetooth is not available or not enabled");
-            Toast.makeText(this, R.string.please_enable_bluetooth, Toast.LENGTH_LONG).show();
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BLUETOOTH);
             return;
         }
 
@@ -310,6 +308,40 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void sendCommand(String command) {
+        runOnUiThread(() -> {
+            if (isConnected && characteristic != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                        && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    statusText.setText(R.string.need_permission_to_connect);
+                    checkAndRequestPermissions();
+                    return;
+                }
+                characteristic.setValue(command);
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                            && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                        statusText.setText(R.string.need_permission_to_connect);
+                        checkAndRequestPermissions();
+                        return;
+                    }
+                    bluetoothGatt.writeCharacteristic(characteristic);
+                    if (!isAutoMode || command.equals("AUTO\n")) {
+                        statusText.setText(String.format(getString(R.string.command_sent), command.trim()));
+                        Log.d(TAG, "Sent command: " + command.trim());
+                    }
+                } catch (SecurityException e) {
+                    statusText.setText(R.string.need_permission_to_connect);
+                    Log.d(TAG, "SecurityException in writeCharacteristic: " + e.getMessage());
+                    checkAndRequestPermissions();
+                }
+            } else {
+                statusText.setText(R.string.not_connected);
+                Log.d(TAG, "Cannot send command: Not connected");
+            }
+        });
+    }
+
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int gattStatus, int newState) {
@@ -362,7 +394,6 @@ public class MainActivity extends Activity {
                     characteristic = service.getCharacteristic(CHARACTERISTIC_UUID);
                     if (characteristic != null) {
                         Log.d(TAG, "Found characteristic FFE1");
-                        // Kích hoạt thông báo
                         try {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                                     && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -417,8 +448,14 @@ public class MainActivity extends Activity {
                 String data = new String(characteristic.getValue());
                 Log.d(TAG, "Received data: " + data);
                 if (data.startsWith("TEMP:")) {
-                    String tempValue = data.replace("TEMP:", "").trim();
-                    runOnUiThread(() -> temperatureText.setText("Temperature: " + tempValue + " °C"));
+                    try {
+                        String tempValue = data.replace("TEMP:", "").trim();
+                        float temp = Float.parseFloat(tempValue);
+                        runOnUiThread(() -> temperatureText.setText(String.format("Temperature: %.1f °C", temp)));
+                    } catch (NumberFormatException e) {
+                        Log.e(TAG, "Invalid temperature format: " + data);
+                        runOnUiThread(() -> temperatureText.setText("Temperature: --.- °C"));
+                    }
                 }
             } catch (SecurityException e) {
                 runOnUiThread(() -> statusText.setText(R.string.need_permission_to_connect));
@@ -426,40 +463,9 @@ public class MainActivity extends Activity {
                 checkAndRequestPermissions();
             }
         }
+    };
 
-        private void sendCommand(String command) {
-        if (isConnected && characteristic != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                    && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                statusText.setText(R.string.need_permission_to_connect);
-                checkAndRequestPermissions();
-                return;
-            }
-            characteristic.setValue(command);
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                        && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                    statusText.setText(R.string.need_permission_to_connect);
-                    checkAndRequestPermissions();
-                    return;
-                }
-                bluetoothGatt.writeCharacteristic(characteristic);
-                if (!isAutoMode || command.equals("AUTO\n")) {
-                    statusText.setText(String.format(getString(R.string.command_sent), command.trim()));
-            Log.d(TAG, "Sent command: " + command.trim());
-                }
-            } catch (SecurityException e) {
-                statusText.setText(R.string.need_permission_to_connect);
-                Log.d(TAG, "SecurityException in writeCharacteristic: " + e.getMessage());
-                checkAndRequestPermissions();
-            }
-        } else {
-            statusText.setText(R.string.not_connected);
-            Log.d(TAG, "Cannot send command: Not connected");
-        }
-    }
-
-private void disconnectFromBluetooth() {
+    private void disconnectFromBluetooth() {
         if (bluetoothGatt != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                     && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -498,9 +504,24 @@ private void disconnectFromBluetooth() {
     }
 
     @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_ENABLE_BLUETOOTH) {
+            if (resultCode == RESULT_OK) {
+                Log.d(TAG, "Bluetooth enabled by user");
+                startScan();
+            } else {
+                statusText.setText(R.string.bluetooth_not_available);
+                Toast.makeText(this, R.string.please_enable_bluetooth, Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
+        handler.removeCallbacksAndMessages(null);
         closeGatt();
         Log.d(TAG, "onDestroy: Resources closed");
     }
-};}
+}

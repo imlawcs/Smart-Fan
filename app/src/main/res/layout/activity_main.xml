@@ -1,106 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:padding="16dp"
-    android:background="#F5F5F5">
+    android:layout_height="match_parent">
 
-    <!-- Status Text -->
-    <TextView
-        android:id="@+id/status"
-        android:layout_width="wrap_content"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Status: Not connected"
-        android:textSize="18sp"
-        android:textColor="#212121"
-        android:layout_marginTop="16dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        android:padding="16dp"
+        android:background="#F5F5F5">
 
-    <!-- Connect/Disconnect Button -->
-    <Button
-        android:id="@+id/btnConnect"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Connect to HMSoft"
-        android:background="@drawable/rounded_button"
-        android:textColor="#FFFFFF"
-        android:padding="8dp"
-        app:layout_constraintTop_toBottomOf="@id/status"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp"/>
+        <!-- Status Text -->
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Status: Not connected"
+            android:textSize="18sp"
+            android:textColor="#212121"
+            android:layout_marginTop="16dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
 
-    <TextView
-        android:id="@+id/temperature"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Temperature: --.- °C" />
-
-    <!-- Circular ON/OFF Button (Larger) -->
-    <Button
-        android:id="@+id/btnToggle"
-        android:layout_width="150dp"
-        android:layout_height="150dp"
-        android:text="OFF"
-        android:textSize="24sp"
-        android:textColor="#FFFFFF"
-        android:background="@drawable/circle_button_off"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-
-    <!-- LinearLayout to Center ON1 and ON2 -->
-    <LinearLayout
-        android:id="@+id/buttonContainer"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintBottom_toTopOf="@id/btnAuto"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="16dp">
-
-        <!-- ON1 Button -->
+        <!-- Connect/Disconnect Button -->
         <Button
-            android:id="@+id/btnOn1"
-            android:layout_width="130dp"
-            android:layout_height="60dp"
-            android:text="ON1 - Slow"
-            android:background="@drawable/rounded_button_gray"
+            android:id="@+id/btnConnect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connect to HMSoft"
+            android:background="@drawable/rounded_button"
             android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:layout_marginEnd="8dp"/>
+            android:padding="8dp"
+            android:contentDescription="Connect or disconnect from Bluetooth device"
+            app:layout_constraintTop_toBottomOf="@id/status"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="8dp"/>
 
-        <!-- ON2 Button -->
+        <!-- Temperature Text -->
+        <TextView
+            android:id="@+id/temperature"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Temperature: --.- °C"
+            android:textSize="18sp"
+            android:textColor="#212121"
+            android:layout_marginTop="8dp"
+            app:layout_constraintTop_toBottomOf="@id/btnConnect"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Circular ON/OFF Button (Larger) -->
         <Button
-            android:id="@+id/btnOn2"
-            android:layout_width="130dp"
-            android:layout_height="60dp"
-            android:text="ON2 - Fast"
-            android:background="@drawable/rounded_button_gray"
+            android:id="@+id/btnToggle"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="OFF"
+            android:textSize="24sp"
             android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:layout_marginStart="8dp"/>
+            android:background="@drawable/circle_button_off"
+            android:contentDescription="Toggle fan on or off"
+            app:layout_constraintWidth_percent="0.4"
+            app:layout_constraintHeight_percent="0.4"
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintTop_toBottomOf="@id/temperature"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="16dp" />
 
-    </LinearLayout>
+        <!-- LinearLayout to Center ON1 and ON2 -->
+        <LinearLayout
+            android:id="@+id/buttonContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintTop_toBottomOf="@id/btnToggle"
+            app:layout_constraintBottom_toTopOf="@id/btnAuto"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp">
 
-    <!-- Auto Mode Button (Centered Bottom) -->
-    <Button
-        android:id="@+id/btnAuto"
-        android:layout_width="120dp"
-        android:layout_height="wrap_content"
-        android:text="AUTO MODE"
-        android:background="@drawable/rounded_button"
-        android:textColor="#FFFFFF"
-        android:padding="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="16dp"/>
+            <!-- ON1 Button -->
+            <Button
+                android:id="@+id/btnOn1"
+                android:layout_width="130dp"
+                android:layout_height="60dp"
+                android:text="ON1 - Slow"
+                android:background="@drawable/rounded_button_gray"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:contentDescription="Set fan to slow speed"
+                android:layout_marginEnd="8dp"/>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+            <!-- ON2 Button -->
+            <Button
+                android:id="@+id/btnOn2"
+                android:layout_width="130dp"
+                android:layout_height="60dp"
+                android:text="ON2 - Fast"
+                android:background="@drawable/rounded_button_gray"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:contentDescription="Set fan to fast speed"
+                android:layout_marginStart="8dp"/>
+
+        </LinearLayout>
+
+        <!-- Auto Mode Button (Centered Bottom) -->
+        <Button
+            android:id="@+id/btnAuto"
+            android:layout_width="120dp"
+            android:layout_height="wrap_content"
+            android:text="AUTO MODE"
+            android:background="@drawable/rounded_button"
+            android:textColor="#FFFFFF"
+            android:padding="8dp"
+            android:contentDescription="Toggle auto mode for fan"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginBottom="16dp"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>
