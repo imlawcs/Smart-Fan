@@ -427,13 +427,7 @@ public class MainActivity extends Activity {
             }
         }
 
-         
-
-         
-
-
-    
-    private void sendCommand(String command) {
+        private void sendCommand(String command) {
         if (isConnected && characteristic != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                     && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -509,4 +503,4 @@ private void disconnectFromBluetooth() {
         closeGatt();
         Log.d(TAG, "onDestroy: Resources closed");
     }
-}
+};}
