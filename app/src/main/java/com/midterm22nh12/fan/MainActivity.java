@@ -465,7 +465,7 @@ public class MainActivity extends Activity {
         }
     }
 
-ate void disconnectFromBluetooth() {
+private void disconnectFromBluetooth() {
         if (bluetoothGatt != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                     && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
