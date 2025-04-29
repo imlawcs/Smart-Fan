@@ -113,7 +113,7 @@ public class MainActivity extends Activity {
                 sendCommand("ON1\n");
                 btnToggle.setText(R.string.on);
                 btnToggle.setBackgroundResource(R.drawable.circle_button_on);
-                btnAuto.setBackgroundResource(R.drawable.circle_button_off);
+                btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
                 isOn = true;
             }
         });
@@ -124,7 +124,7 @@ public class MainActivity extends Activity {
                 sendCommand("ON2\n");
                 btnToggle.setText(R.string.on);
                 btnToggle.setBackgroundResource(R.drawable.circle_button_on);
-                btnAuto.setBackgroundResource(R.drawable.circle_button_off);
+                btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
                 isOn = true;
             }
         });
