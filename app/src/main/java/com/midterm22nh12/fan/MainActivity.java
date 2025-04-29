@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
@@ -35,7 +36,7 @@ public class MainActivity extends Activity {
 
     // UI components
     private Button btnAuto, btnOn1, btnOn2, btnToggle, btnConnect;
-    private TextView statusText;
+    private TextView statusText, temperatureText;
 
     // State variables
     private boolean isOn = false;
@@ -47,10 +48,11 @@ public class MainActivity extends Activity {
     private BluetoothLeScanner bluetoothLeScanner;
     private BluetoothGatt bluetoothGatt;
     private BluetoothGattCharacteristic characteristic;
-    private static final String DEVICE_NAME = "HMSoft"; // Hoặc "QuatTuDong" nếu đã đổi
+    private static final String DEVICE_NAME = "HMSoft"; // Hoặc tên HM-10 của bạn
     private static final UUID SERVICE_UUID = UUID.fromString("0000FFE0-0000-1000-8000-00805F9B34FB");
     private static final UUID CHARACTERISTIC_UUID = UUID.fromString("0000FFE1-0000-1000-8000-00805F9B34FB");
-    private static final long SCAN_PERIOD = 10000; // Quét trong 10 giây
+    private static final UUID CLIENT_CHARACTERISTIC_CONFIG = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB");
+    private static final long SCAN_PERIOD = 10000;
 
     // Permission request code
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 1;
@@ -62,8 +64,9 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-// Initialize UI components
+        // Initialize UI components
         statusText = findViewById(R.id.status);
+        temperatureText = findViewById(R.id.temperature);
         btnAuto = findViewById(R.id.btnAuto);
         btnOn1 = findViewById(R.id.btnOn1);
         btnOn2 = findViewById(R.id.btnOn2);
@@ -98,7 +101,7 @@ public class MainActivity extends Activity {
                 btnAuto.setBackgroundResource(R.drawable.rounded_button);
             } else {
                 sendCommand("MANUAL\n");
-                sendCommand("OFF\n");
+                handler.postDelayed(() -> sendCommand("OFF\n"), 100);
                 statusText.setText(R.string.auto_mode_off);
                 btnToggle.setText(R.string.off);
                 btnToggle.setBackgroundResource(R.drawable.circle_button_off);
@@ -110,7 +113,7 @@ public class MainActivity extends Activity {
         btnOn1.setOnClickListener(v -> {
             if (!isAutoMode) {
                 sendCommand("MANUAL\n");
-                sendCommand("ON1\n");
+                handler.postDelayed(() -> sendCommand("ON1\n"), 100);
                 btnToggle.setText(R.string.on);
                 btnToggle.setBackgroundResource(R.drawable.circle_button_on);
                 btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
@@ -121,7 +124,7 @@ public class MainActivity extends Activity {
         btnOn2.setOnClickListener(v -> {
             if (!isAutoMode) {
                 sendCommand("MANUAL\n");
-                sendCommand("ON2\n");
+                handler.postDelayed(() -> sendCommand("ON2\n"), 100);
                 btnToggle.setText(R.string.on);
                 btnToggle.setBackgroundResource(R.drawable.circle_button_on);
                 btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
@@ -133,13 +136,13 @@ public class MainActivity extends Activity {
             if (!isAutoMode) {
                 if (isOn) {
                     sendCommand("MANUAL\n");
-                    sendCommand("OFF\n");
+                    handler.postDelayed(() -> sendCommand("OFF\n"), 100);
                     btnToggle.setText(R.string.off);
                     btnToggle.setBackgroundResource(R.drawable.circle_button_off);
                     isOn = false;
                 } else {
                     sendCommand("MANUAL\n");
-                    sendCommand("ON1\n");
+                    handler.postDelayed(() -> sendCommand("ON1\n"), 100);
                     btnToggle.setText(R.string.on);
                     btnToggle.setBackgroundResource(R.drawable.circle_button_on);
                     isOn = true;
@@ -150,7 +153,6 @@ public class MainActivity extends Activity {
 
     private void checkAndRequestPermissions() {
         ArrayList<String> permissionsToRequest = new ArrayList<>();
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT);
@@ -262,7 +264,6 @@ public class MainActivity extends Activity {
                 return;
             }
 
-// Dừng quét sau SCAN_PERIOD
             handler.postDelayed(() -> {
                 try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -337,6 +338,7 @@ public class MainActivity extends Activity {
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 runOnUiThread(() -> {
                     statusText.setText(R.string.disconnected);
+                    temperatureText.setText("Temperature: --.- °C");
                     isConnected = false;
                     isAutoMode = false;
                     isOn = false;
@@ -360,6 +362,26 @@ public class MainActivity extends Activity {
                     characteristic = service.getCharacteristic(CHARACTERISTIC_UUID);
                     if (characteristic != null) {
                         Log.d(TAG, "Found characteristic FFE1");
+                        // Kích hoạt thông báo
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                                    && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                                runOnUiThread(() -> statusText.setText(R.string.need_permission_to_connect));
+                                checkAndRequestPermissions();
+                                return;
+                            }
+                            gatt.setCharacteristicNotification(characteristic, true);
+                            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG);
+                            if (descriptor != null) {
+                                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                                gatt.writeDescriptor(descriptor);
+                                Log.d(TAG, "Enabled notifications for characteristic FFE1");
+                            }
+                        } catch (SecurityException e) {
+                            runOnUiThread(() -> statusText.setText(R.string.need_permission_to_connect));
+                            Log.d(TAG, "SecurityException in enabling notifications: " + e.getMessage());
+                            checkAndRequestPermissions();
+                        }
                     } else {
                         runOnUiThread(() -> statusText.setText(R.string.characteristic_not_found));
                         Log.d(TAG, "Characteristic FFE1 not found");
@@ -381,8 +403,36 @@ public class MainActivity extends Activity {
                 Log.d(TAG, "Failed to send command");
             }
         }
-    };
 
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+            super.onCharacteristicChanged(gatt, characteristic);
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                        && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    runOnUiThread(() -> statusText.setText(R.string.need_permission_to_connect));
+                    checkAndRequestPermissions();
+                    return;
+                }
+                String data = new String(characteristic.getValue());
+                Log.d(TAG, "Received data: " + data);
+                if (data.startsWith("TEMP:")) {
+                    String tempValue = data.replace("TEMP:", "").trim();
+                    runOnUiThread(() -> temperatureText.setText("Temperature: " + tempValue + " °C"));
+                }
+            } catch (SecurityException e) {
+                runOnUiThread(() -> statusText.setText(R.string.need_permission_to_connect));
+                Log.d(TAG, "SecurityException in onCharacteristicChanged: " + e.getMessage());
+                checkAndRequestPermissions();
+            }
+        }
+
+         
+
+         
+
+
+    
     private void sendCommand(String command) {
         if (isConnected && characteristic != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -402,7 +452,7 @@ public class MainActivity extends Activity {
                 bluetoothGatt.writeCharacteristic(characteristic);
                 if (!isAutoMode || command.equals("AUTO\n")) {
                     statusText.setText(String.format(getString(R.string.command_sent), command.trim()));
-                    Log.d(TAG, "Sent command: " + command.trim());
+            Log.d(TAG, "Sent command: " + command.trim());
                 }
             } catch (SecurityException e) {
                 statusText.setText(R.string.need_permission_to_connect);
@@ -415,7 +465,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void disconnectFromBluetooth() {
+ate void disconnectFromBluetooth() {
         if (bluetoothGatt != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                     && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {

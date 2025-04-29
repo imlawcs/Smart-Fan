@@ -34,6 +34,12 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="8dp"/>
 
+    <TextView
+        android:id="@+id/temperature"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Temperature: --.- °C" />
+
     <!-- Circular ON/OFF Button (Larger) -->
     <Button
         android:id="@+id/btnToggle"
