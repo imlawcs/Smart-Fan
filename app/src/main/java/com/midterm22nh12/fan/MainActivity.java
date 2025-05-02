@@ -1,6 +1,7 @@
 package com.midterm22nh12.fan;
 
 import android.Manifest;
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -23,7 +24,6 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -32,7 +32,7 @@ import com.midterm22nh12.fan.R;
 import java.util.ArrayList;
 import java.util.UUID;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
     // UI components
     private Button btnAuto, btnOn1, btnOn2, btnToggle, btnConnect;
@@ -62,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        setTheme(R.style.Theme_Fan); // Áp dụng theme thủ công để giữ màu sắc
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -154,6 +155,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkAndRequestPermissions() {
         ArrayList<String> permissionsToRequest = new ArrayList<>();
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT);
@@ -167,6 +169,10 @@ public class MainActivity extends AppCompatActivity {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
             Log.d(TAG, "Requesting ACCESS_FINE_LOCATION permission");
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+            Log.d(TAG, "Requesting ACCESS_COARSE_LOCATION permission");
         }
 
         if (!permissionsToRequest.isEmpty()) {
@@ -376,7 +382,7 @@ public class MainActivity extends AppCompatActivity {
                     isOn = false;
                     btnConnect.setText(R.string.connect_to_hmsoft);
                     btnConnect.setBackgroundResource(R.drawable.rounded_button);
-                    btnAuto.setBackgroundResource(R.drawable.circle_button_off);
+                    btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
                     btnToggle.setText(R.string.off);
                     btnToggle.setBackgroundResource(R.drawable.circle_button_off);
                     Log.d(TAG, "Disconnected from HMSoft");
