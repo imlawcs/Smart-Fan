@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        setTheme(R.style.Theme_Fan); // Áp dụng theme thủ công để giữ màu sắc
+        setTheme(R.style.Theme_Fan);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -84,6 +84,11 @@ public class MainActivity extends Activity {
         // Check and request permissions
         checkAndRequestPermissions();
 
+        // Cập nhật trạng thái ban đầu của btnToggle
+        isOn = false; // Mặc định quạt tắt
+        btnToggle.setText(R.string.on); // Hiển thị "ON" để biểu thị nhấn sẽ bật
+        btnToggle.setBackgroundResource(R.drawable.circle_button_on); // Nền biểu thị trạng thái tắt
+
         // Set up button listeners
         btnConnect.setOnClickListener(v -> {
             if (!isConnected) {
@@ -100,15 +105,17 @@ public class MainActivity extends Activity {
             if (isAutoMode) {
                 sendCommand("AUTO\n");
                 statusText.setText(R.string.auto_mode_on);
-                btnAuto.setBackgroundResource(R.drawable.rounded_button);
+                btnAuto.setBackgroundResource(R.drawable.rounded_button_disconnect);
+                btnToggle.setText(R.string.on); // Khi thoát auto, hiển thị "OFF" (tắt)
+                btnToggle.setBackgroundResource(R.drawable.circle_button_on);
             } else {
                 sendCommand("MANUAL\n");
                 handler.postDelayed(() -> sendCommand("OFF\n"), 100);
                 statusText.setText(R.string.auto_mode_off);
-                btnToggle.setText(R.string.off);
-                btnToggle.setBackgroundResource(R.drawable.circle_button_off);
-                btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
-                isOn = false;
+                btnToggle.setText(R.string.on); // Khi thoát auto, hiển thị "OFF" (tắt)
+                btnToggle.setBackgroundResource(R.drawable.circle_button_on);
+                btnAuto.setBackgroundResource(R.drawable.rounded_button);
+                isOn = false; // Đặt lại thành false khi thoát auto mode
             }
         });
 
@@ -116,10 +123,12 @@ public class MainActivity extends Activity {
             if (!isAutoMode) {
                 sendCommand("MANUAL\n");
                 handler.postDelayed(() -> sendCommand("ON1\n"), 100);
-                btnToggle.setText(R.string.on);
-                btnToggle.setBackgroundResource(R.drawable.circle_button_on);
-                btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
+                btnToggle.setText(R.string.off); // Chuyển thành "OFF" khi bật
+                btnToggle.setBackgroundResource(R.drawable.circle_button_off);
+                btnAuto.setBackgroundResource(R.drawable.rounded_button);
                 isOn = true;
+            } else {
+                Toast.makeText(this, "Auto mode is ON. Turn it off to control manually.", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -127,28 +136,32 @@ public class MainActivity extends Activity {
             if (!isAutoMode) {
                 sendCommand("MANUAL\n");
                 handler.postDelayed(() -> sendCommand("ON2\n"), 100);
-                btnToggle.setText(R.string.on);
-                btnToggle.setBackgroundResource(R.drawable.circle_button_on);
-                btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
+                btnToggle.setText(R.string.off); // Chuyển thành "OFF" khi bật
+                btnToggle.setBackgroundResource(R.drawable.circle_button_off);
+                btnAuto.setBackgroundResource(R.drawable.rounded_button);
                 isOn = true;
+            } else {
+                Toast.makeText(this, "Auto mode is ON. Turn it off to control manually.", Toast.LENGTH_SHORT).show();
             }
         });
 
         btnToggle.setOnClickListener(v -> {
             if (!isAutoMode) {
-                if (isOn) {
-                    sendCommand("MANUAL\n");
-                    handler.postDelayed(() -> sendCommand("OFF\n"), 100);
-                    btnToggle.setText(R.string.off);
-                    btnToggle.setBackgroundResource(R.drawable.circle_button_off);
-                    isOn = false;
-                } else {
+                if (!isOn) { // Nếu đang tắt (isOn = false), nhấn để bật
                     sendCommand("MANUAL\n");
                     handler.postDelayed(() -> sendCommand("ON1\n"), 100);
-                    btnToggle.setText(R.string.on);
-                    btnToggle.setBackgroundResource(R.drawable.circle_button_on);
+                    btnToggle.setText(R.string.off); // Chuyển thành "OFF" để biểu thị nhấn sẽ tắt
+                    btnToggle.setBackgroundResource(R.drawable.circle_button_off);
                     isOn = true;
+                } else { // Nếu đang bật (isOn = true), nhấn để tắt
+                    sendCommand("MANUAL\n");
+                    handler.postDelayed(() -> sendCommand("OFF\n"), 100);
+                    btnToggle.setText(R.string.on); // Chuyển thành "ON" để biểu thị nhấn sẽ bật
+                    btnToggle.setBackgroundResource(R.drawable.circle_button_on);
+                    isOn = false;
                 }
+            } else {
+                Toast.makeText(this, "Auto mode is ON. Turn it off to control manually.", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -379,11 +392,11 @@ public class MainActivity extends Activity {
                     temperatureText.setText("Temperature: --.- °C");
                     isConnected = false;
                     isAutoMode = false;
-                    isOn = false;
+                    isOn = false; // Đặt lại thành false
                     btnConnect.setText(R.string.connect_to_hmsoft);
                     btnConnect.setBackgroundResource(R.drawable.rounded_button);
                     btnAuto.setBackgroundResource(R.drawable.rounded_button_gray);
-                    btnToggle.setText(R.string.off);
+                    btnToggle.setText(R.string.on); // Hiển thị "ON" để biểu thị nhấn sẽ bật
                     btnToggle.setBackgroundResource(R.drawable.circle_button_off);
                     Log.d(TAG, "Disconnected from HMSoft");
                 });
